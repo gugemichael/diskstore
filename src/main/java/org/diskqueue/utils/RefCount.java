@@ -5,11 +5,11 @@ import java.util.concurrent.atomic.AtomicInteger;
 public abstract class RefCount {
     private AtomicInteger count = new AtomicInteger();
 
-    public void incr() {
+    public void incrRef() {
         this.count.incrementAndGet();
     }
 
-    public void decr() {
+    public void decrRef() {
         if (this.count.decrementAndGet() == 0)
             recyle();
     }

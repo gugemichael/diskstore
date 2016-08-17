@@ -26,7 +26,7 @@ public class PersistenceQueue<E> extends DiskQueue<E> {
 
     @Override
     public boolean offer(E e) {
-        storage.add(new Record().setObject(e));
+        storage.write(new Record().setObject(e));
         return true;
     }
 
@@ -40,7 +40,7 @@ public class PersistenceQueue<E> extends DiskQueue<E> {
 
     @Override
     public E poll() {
-        return (E) storage.pop().getObject();
+        return (E) storage.read().getObject();
     }
 
     @Override
@@ -53,6 +53,6 @@ public class PersistenceQueue<E> extends DiskQueue<E> {
 
     @Override
     public E peek() {
-        return (E) storage.peek().getObject();
+        return null;
     }
 }

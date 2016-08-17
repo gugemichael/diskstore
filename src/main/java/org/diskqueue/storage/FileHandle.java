@@ -1,24 +1,40 @@
 package org.diskqueue.storage;
 
+import org.diskqueue.storage.block.Block;
+import org.diskqueue.storage.block.DataFile;
+import org.diskqueue.storage.block.Slice;
 import org.diskqueue.storage.manager.FileManager;
-import org.diskqueue.utils.RefCount;
 
-import java.io.File;
+import java.io.Flushable;
+import java.io.IOException;
 
-public class FileHandle extends RefCount {
 
-    // belonged FileManager. used to recyle itself
-    private FileManager fileManager;
-    // java file struct
-    private File target;
+public class FileHandle implements Flushable {
+    // parent store
+    private final FileManager fileManager;
 
-    public FileHandle(FileManager fileManager, String fileName) {
+    /**
+     * data file and write-read block. producer is writting
+     * while consume is reading.
+     */
+    private DataFile producer;
+    private DataFile consume;
+    private volatile Block writeBlock;
+    private volatile Block readBlock;
+
+    public FileHandle(FileManager fileManager) {
         this.fileManager = fileManager;
-        this.target = new File(fileName);
+    }
+
+    public void write(Slice slice) {
+        if (writeBlock == null) {
+            // no block space to be written. we create a new one
+
+        }
     }
 
     @Override
-    public void recyle() {
-        fileManager.giveback(this);
+    public void flush() throws IOException {
+        producer.flushAll();
     }
 }

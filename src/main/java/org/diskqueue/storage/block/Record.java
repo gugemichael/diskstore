@@ -7,7 +7,7 @@ public class Record {
     // original body object
     private Object object;
     // serialized body represents by byte array
-    private byte[] content;
+    private byte[] body;
 
     public int getLength() {
         return length;
@@ -27,12 +27,12 @@ public class Record {
         return this;
     }
 
-    public byte[] getContent() {
-        return content;
+    public byte[] getBody() {
+        return body;
     }
 
-    public Record setContent(byte[] content) {
-        this.content = content;
+    public Record setBody(byte[] body) {
+        this.body = body;
         return this;
     }
 }

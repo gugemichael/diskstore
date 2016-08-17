@@ -1,6 +1,8 @@
 package org.diskqueue.option;
 
 
+import java.nio.ByteOrder;
+
 public class Options<T> {
 
     // default value for every option
@@ -18,7 +20,7 @@ public class Options<T> {
      * take sync operation with the following policy
      *
      * NONE,                     don't take sync behaviour. depends on system flush
-     * ONCE,                     sync with every add() method called. always issue to disk
+     * ONCE,                     sync with every write() method called. always issue to disk
      * MMAP_PAGECACHE,  sync with every Block fills up
      * EVERY_SECOND,      sync every second
      */
@@ -41,6 +43,12 @@ public class Options<T> {
      *
      * @see StorageType
      */
-    public static Options<StorageType> STORAGE = new Options<>(StorageType.MMAPED_FILE);
+    public static Options<StorageType> STORAGE = new Options<>(StorageType.PERSISTENCE);
+
+    /**
+     * byteorder of storage file binary stream
+     *
+     */
+    public static Options<ByteOrder> BYTE_ORDER= new Options<>(ByteOrder.BIG_ENDIAN);
 }
 

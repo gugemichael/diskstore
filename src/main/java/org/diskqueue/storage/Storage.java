@@ -5,10 +5,7 @@ import org.diskqueue.storage.block.Record;
 /**
  * An abstract of underlayer storage
  */
-public interface Storage extends Accessor {
-    public void add(Record record);
-
-    public Record pop();
-
-    public Record peek();
+public interface Storage extends RandomAccessable {
+    void write(Record record);
+    Record read();
 }

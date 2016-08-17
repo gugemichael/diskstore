@@ -2,7 +2,8 @@ package org.diskqueue.controller;
 
 import org.diskqueue.controller.impl.PersistenceQueue;
 import org.diskqueue.option.Options;
-import org.diskqueue.storage.MMapedStorage;
+import org.diskqueue.storage.DiskStorage;
+import org.diskqueue.storage.MMappedStore;
 import org.diskqueue.storage.Storage;
 
 import java.util.AbstractCollection;
@@ -51,17 +52,20 @@ public abstract class DiskQueue<E> extends AbstractCollection<E> implements Queu
                 return option.defaultValue();
         }
 
-        public DiskQueue build() {
+        public DiskQueue build() throws IllegalAccessException {
             String queueName = option(Options.NAME);
             Storage storage = null;
             switch (option(Options.STORAGE)) {
-            case MMAPED_FILE:
-                storage = new MMapedStorage(option(Options.SYNC));
+            case PERSISTENCE:
+                // memory mapped storage engine. It's a container of
+                // following actually I/O store
+                storage = new DiskStorage().use(new MMappedStore().byteOrder(option(Options.BYTE_ORDER))
+                                            .syncer(option(Options.SYNC)).initialize(option(Options.DATA_PATH), option(Options.NAME)));
                 break;
             case MEMORY:
-            case GENERIC_FILE:
                 throw new UnsupportedOperationException();
             }
+            assert (storage != null);
             return new PersistenceQueue(queueName, storage);
         }
     }
