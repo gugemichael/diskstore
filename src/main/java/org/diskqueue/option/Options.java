@@ -1,8 +1,6 @@
 package org.diskqueue.option;
 
 
-import java.nio.ByteOrder;
-
 public class Options<T> {
 
     // default value for every option
@@ -20,14 +18,13 @@ public class Options<T> {
      * take sync operation with the following policy
      *
      * NONE,                     don't take sync behaviour. depends on system flush
-     * ONCE,                     sync with every write() method called. always issue to disk
-     * MMAP_PAGECACHE,  sync with every Block fills up
+     * BLOCK,                   sync with every Block fills up
      * EVERY_SECOND,      sync every second
      */
-    public static Options<Syncer> SYNC = new Options<>(Syncer.MMAP_PAGECACHE);
+    public static Options<Syncer> SYNC = new Options<>(Syncer.BLOCK);
 
     /**
-     * a folder path that includes meta data files and block files
+     * a folder path that includes manifest and data files
      *
      */
     public static Options<String> DATA_PATH = new Options<>("./");
@@ -49,6 +46,9 @@ public class Options<T> {
      * byteorder of storage file binary stream
      *
      */
-    public static Options<ByteOrder> BYTE_ORDER= new Options<>(ByteOrder.BIG_ENDIAN);
+//    public static Options<ByteOrder> BYTE_ORDER= new Options<>(ByteOrder.BIG_ENDIAN);
+
+
+    public static Options<Boolean> RECOVERY = new Options<>(Boolean.TRUE);
 }
 

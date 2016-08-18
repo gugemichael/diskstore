@@ -1,17 +1,11 @@
 package org.diskqueue.storage.block;
 
 public class Slice {
-    private byte[] body;
+    public byte[] body;
+    public int size;
 
     public Slice(byte[] body) {
         this.body = body;
-    }
-
-    public byte[] getBody() {
-        return body;
-    }
-
-    public void setBody(byte[] body) {
-        this.body = body;
+        this.size = body.length;
     }
 }

@@ -1,5 +1,5 @@
 package org.diskqueue.storage;
 
 public interface RandomAccessable {
-    void seek(StorageOffset offset);
+    void seek(Offset offset);
 }

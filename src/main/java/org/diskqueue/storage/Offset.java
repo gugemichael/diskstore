@@ -1,6 +1,6 @@
 package org.diskqueue.storage;
 
-public class StorageOffset {
+public class Offset {
     // offset position
     private int offset;
 }

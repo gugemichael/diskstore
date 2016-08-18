@@ -3,7 +3,7 @@ package org.diskqueue.controller;
 import org.diskqueue.controller.impl.PersistenceQueue;
 import org.diskqueue.option.Options;
 import org.diskqueue.storage.DiskStorage;
-import org.diskqueue.storage.MMappedStore;
+import org.diskqueue.storage.store.MappedAppendOnlyStore;
 import org.diskqueue.storage.Storage;
 
 import java.util.AbstractCollection;
@@ -42,6 +42,7 @@ public abstract class DiskQueue<E> extends AbstractCollection<E> implements Queu
          *
          * @param option named option already defined
          * @return setted value or default value
+         *
          */
         @SuppressWarnings("unchecked")
         public <T> T option(Options<T> option) {
@@ -53,20 +54,22 @@ public abstract class DiskQueue<E> extends AbstractCollection<E> implements Queu
         }
 
         public DiskQueue build() throws IllegalAccessException {
-            String queueName = option(Options.NAME);
             Storage storage = null;
             switch (option(Options.STORAGE)) {
             case PERSISTENCE:
                 // memory mapped storage engine. It's a container of
                 // following actually I/O store
-                storage = new DiskStorage().use(new MMappedStore().byteOrder(option(Options.BYTE_ORDER))
-                                            .syncer(option(Options.SYNC)).initialize(option(Options.DATA_PATH), option(Options.NAME)));
+                DiskStorage diskStorage = new DiskStorage();
+                storage = diskStorage.use(new MappedAppendOnlyStore(diskStorage)
+                                                        .recovery(option(Options.RECOVERY))
+                                                        .syncer(option(Options.SYNC))
+                                                        .initialize(option(Options.DATA_PATH), option(Options.NAME)));
                 break;
             case MEMORY:
                 throw new UnsupportedOperationException();
             }
             assert (storage != null);
-            return new PersistenceQueue(queueName, storage);
+            return new PersistenceQueue(option(Options.NAME), storage);
         }
     }
 }

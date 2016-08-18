@@ -1,4 +1,4 @@
-package org.diskqueue.storage;
+package org.diskqueue.storage.store;
 
 import org.diskqueue.option.Syncer;
 
@@ -7,21 +7,25 @@ import java.io.IOException;
 
 public abstract class Flusher {
 
-    protected Flushable flushable;
+    /**
+     * flush target object
+     */
+    Flushable flushable;
 
     private Flusher(Flushable flushable) {
         this.flushable = flushable;
     }
 
+    /**
+     * real flush method
+     */
     public abstract void flushAll() throws IOException;
 
     public static Flusher policy(Flushable flushable, Syncer syncer) {
         switch (syncer) {
         case NONE:
             return new NoneFlusher(flushable);
-        case ONCE:
-            return new OnceFlusher(flushable);
-        case MMAP_PAGECACHE:
+        case BLOCK:
             return new PageCacheFlusher(flushable);
         case EVERY_SECOND:
             return new EverySecondFlusher(flushable);
@@ -37,17 +41,6 @@ public abstract class Flusher {
 
         @Override
         public void flushAll() {
-        }
-    }
-
-    static class OnceFlusher extends Flusher {
-        public OnceFlusher(Flushable flushable) {
-            super(flushable);
-        }
-
-        @Override
-        public void flushAll() throws IOException {
-            flushable.flush();
         }
     }
 
