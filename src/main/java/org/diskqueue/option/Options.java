@@ -21,7 +21,7 @@ public class Options<T> {
      * BLOCK,                   sync with every Block fills up
      * EVERY_SECOND,      sync every second
      */
-    public static Options<Syncer> SYNC = new Options<>(Syncer.BLOCK);
+    public static Options<Syncer> SYNC = new Options<>(Syncer.EVERY_SECOND);
 
     /**
      * a folder path that includes manifest and data files

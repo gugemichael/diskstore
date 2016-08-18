@@ -12,7 +12,7 @@ import java.util.concurrent.BlockingQueue;
  */
 public class AsyncIOFlusher extends Hypervisor {
     // tasks of file is being deleted
-    private BlockingQueue<DiskFile> flushQueue = new ArrayBlockingQueue<DiskFile>(8192);
+    private BlockingQueue<DiskFile> flushQueue = new ArrayBlockingQueue<>(512);
 
     AsyncIOFlusher() {
         super("Async-I/O-Thread-Flusher", false);
@@ -25,6 +25,7 @@ public class AsyncIOFlusher extends Hypervisor {
             for (; ; ) {
                 flushable = flushQueue.take();
                 flushable.sync();
+                System.out.println(flushQueue.size());
             }
         } catch (InterruptedException e) {
             e.printStackTrace();
@@ -33,6 +34,10 @@ public class AsyncIOFlusher extends Hypervisor {
     }
 
     public void flush(DiskFile flushable) {
-        flushQueue.offer(flushable);
+        try {
+            flushQueue.put(flushable);
+        } catch (InterruptedException e) {
+            e.printStackTrace();
+        }
     }
 }

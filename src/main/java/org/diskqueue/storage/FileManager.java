@@ -41,6 +41,7 @@ public class FileManager {
         FileManager fileManager = new FileManager();
 
         fileManager.deleter.start();
+        fileManager.flusher.start();
 
         /**
          * namespace of these files. include follow names suppose our folder called "diskqueue" :

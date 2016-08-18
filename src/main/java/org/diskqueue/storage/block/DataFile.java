@@ -51,7 +51,7 @@ public class DataFile extends DiskFile implements RefCount {
                 header.setBlockCount(header.getBlockCount() + 1);
                 header.writeable();
                 mmapBuffer.put(presentBlock.getMemory());
-                fileManager.getFlusher().flush(this);
+//                sync();
             }
 
             presentBlock = Block.create();

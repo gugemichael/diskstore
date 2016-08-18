@@ -13,7 +13,7 @@ public class SimpleStore {
 
         DiskStorage diskStorage = new DiskStorage();
         diskStorage.use(new MappedAppendOnlyStore(diskStorage)
-                            .recovery(true).syncer(Syncer.BLOCK).initialize("/tmp/diskqueue", "diskqueue"));
+                            .recovery(true).syncer(Syncer.EVERY_SECOND).initialize("/tmp/diskqueue", "diskqueue"));
 
         long i = 10000000000L;
         byte[] mem = new byte[128];

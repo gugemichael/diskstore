@@ -1,6 +1,5 @@
 package org.diskqueue.option;
 
 public enum Syncer {
-    NONE, BLOCK, EVERY_SECOND
-
+    PAGE_CACHE, EVERY_SECOND
 }

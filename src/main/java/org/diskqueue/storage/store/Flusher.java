@@ -23,24 +23,12 @@ public abstract class Flusher {
 
     public static Flusher policy(Flushable flushable, Syncer syncer) {
         switch (syncer) {
-        case NONE:
-            return new NoneFlusher(flushable);
-        case BLOCK:
+        case PAGE_CACHE:
             return new PageCacheFlusher(flushable);
         case EVERY_SECOND:
             return new EverySecondFlusher(flushable);
         default:
             throw new UnsupportedOperationException();
-        }
-    }
-
-    static class NoneFlusher extends Flusher {
-        public NoneFlusher(Flushable flushable) {
-            super(flushable);
-        }
-
-        @Override
-        public void flushAll() {
         }
     }
 
