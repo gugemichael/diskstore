@@ -15,7 +15,7 @@ public class AsyncIOFlusher extends Hypervisor {
     private BlockingQueue<DiskFile> flushQueue = new ArrayBlockingQueue<>(512);
 
     AsyncIOFlusher() {
-        super("Async-I/O-Thread-Flusher", false);
+        super("Async-I/O-Thread-Flusher", true);
     }
 
     @Override

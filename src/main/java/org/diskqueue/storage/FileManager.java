@@ -2,13 +2,16 @@ package org.diskqueue.storage;
 
 import org.diskqueue.storage.block.DataFile;
 import org.diskqueue.storage.meta.Manifest;
+import org.diskqueue.utils.FileUtils;
 import org.diskqueue.utils.RefCounter;
 
 import java.io.File;
 import java.io.FilenameFilter;
 import java.io.IOException;
-import java.util.*;
-import java.util.concurrent.ConcurrentLinkedDeque;
+import java.util.Arrays;
+import java.util.Comparator;
+import java.util.Date;
+import java.util.concurrent.ConcurrentSkipListMap;
 import java.util.concurrent.atomic.AtomicInteger;
 
 public class FileManager {
@@ -25,12 +28,12 @@ public class FileManager {
     // manifest metadata file
     private Manifest manifest;
     // data block files
-    private Deque<RefCounter<DataFile>> dataBlockFileList = new ConcurrentLinkedDeque<>();
+    private ConcurrentSkipListMap<DataFile, RefCounter<DataFile>> dataBlockFileList = new ConcurrentSkipListMap<>();
+    // private Set<DataFile> fileCache = new ConcurrentSkipListSet<>();
 
     // disk file deleter thread who is responsibility for clean up
     // consumed (refcount equals zero) files
     private final FileCleanupDeleter deleter = new FileCleanupDeleter();
-    private final AsyncIOFlusher flusher = new AsyncIOFlusher();
 
     public static FileManager build(File folder) throws IOException {
         return build(folder, true);
@@ -38,10 +41,9 @@ public class FileManager {
 
     public static FileManager build(File folder, boolean recovery) throws IOException {
         // new instance from current path
-        FileManager fileManager = new FileManager();
+        final FileManager fileManager = new FileManager();
 
         fileManager.deleter.start();
-        fileManager.flusher.start();
 
         /**
          * namespace of these files. include follow names suppose our folder called "diskqueue" :
@@ -64,9 +66,9 @@ public class FileManager {
         // analyze and recovery manifest
         File meta = new File(String.format("%s/%s", folder.getAbsolutePath(), String.format(MANIFEST_FILE_NAME, namespace)));
         fileManager.manifest = new Manifest(fileManager, meta);
-        fileManager.manifest.checkout();
+        fileManager.manifest.load();
 
-        // load data block files
+        // only load data block files
         File[] dataBlockList = folder.listFiles(new FilenameFilter() {
             @Override
             public boolean accept(File dir, String name) {
@@ -75,80 +77,89 @@ public class FileManager {
         });
 
         if (dataBlockList != null && dataBlockList.length != 0) {
-            // do recovery
-            DataFile[] sortedDataFiles = new DataFile[dataBlockList.length];
-            for (int i = 0; i != dataBlockList.length; i++)
-                sortedDataFiles[i] = fileManager.__internalNew(dataBlockList[i]);
+            // do recovery and load persistence file into file cache
+            DataFile[] dataFileArray = new DataFile[dataBlockList.length];
 
-            // sort by file number in the suffix of file name
-            Arrays.sort(sortedDataFiles, 0, sortedDataFiles.length, new Comparator<DataFile>() {
+            // sort data file by number
+            Arrays.sort(dataBlockList, new Comparator<File>() {
                 @Override
-                public int compare(DataFile first, DataFile second) {
-                    // I don't care numberic overflow
-                    return first.getFileNumber() - second.getFileNumber();
+                public int compare(File first, File second) {
+                    return FileUtils.getFileNumber(first.getName()) - FileUtils.getFileNumber(second.getName());
                 }
             });
+            int i = 0;
+            for (; i < dataBlockList.length - 1; i++)
+                dataFileArray[i] = DataFile.load(fileManager, dataBlockList[i]);
+            // make the latest one writeable
+            dataFileArray[i] = DataFile.New(fileManager, dataBlockList[i]);
+
 
             // add them to deque
-            for (DataFile file : sortedDataFiles) {
-                System.out.println(file.getGenericFile().getName());
-                fileManager.dataBlockFileList.offer(new RefCounter<DataFile>(file));
+            for (DataFile file : dataFileArray) {
+                fileManager.dataBlockFileList.put(file, new RefCounter<DataFile>(file));
             }
 
-            fileManager.nextSequenceFileNumber.set(fileManager.dataBlockFileList.getLast().getInstance().getFileNumber() + 1);
+            // we are manpulating the newest one. since we hold its reference
+            fileManager.dataBlockFileList.lastEntry().getValue().incrRef();
+            // fix next number
+            fileManager.nextSequenceFileNumber.set(fileManager.dataBlockFileList.lastEntry().getKey().getFileNumber() + 1);
         } else {
             // we create at lease one DataFile
-            fileManager.newDataFile();
+            fileManager.createDataFile();
         }
 
-        // fileManager.sync();
+        // may be sync twice ! but it's OK
+        fileManager.syncMeta();
+
+        for (RefCounter<DataFile> ref : fileManager.dataBlockFileList.values())
+            System.out.println(ref.getInstance().getGenericFile().getName() + ", " + ref.getRefCount());
 
         return fileManager;
     }
 
-    public synchronized DataFile newDataFile() throws IOException {
-        DataFile datafile = __internalNew(
+    public synchronized DataFile createDataFile() throws IOException {
+        DataFile datafile = DataFile.New(this,
                 new File(String.format("%s/%s.block.%d", folder.getAbsolutePath(), namespace, nextSequenceFileNumber.intValue())));
-        dataBlockFileList.offer(new RefCounter<DataFile>(datafile));
+        // add to deque and wait to be read
+        dataBlockFileList.put(datafile, new RefCounter<DataFile>(datafile).incrRef());
         // auto increment
         nextSequenceFileNumber.incrementAndGet();
+        // fill the last created file
+        manifest.LastCreatedDataFile = datafile.getGenericFile().getName();
 
+        syncMeta();
         return datafile;
     }
 
-    private DataFile __internalNew(File data) throws IOException {
-        DataFile datafile = new DataFile(this, data);
-        if (!datafile.checkout())
-            throw new IOException(String.format("new data block file failed : %s", datafile.getGenericFile().getName()));
+    public synchronized DataFile getEarliestDataFile() {
+        if (dataBlockFileList.isEmpty())
+            return null;
 
-        // change meta data.
-        manifest.LastCreatedDataFile = datafile.getGenericFile().getName();
+        // pop the earliest data file
+        RefCounter<DataFile> reference = dataBlockFileList.firstEntry().getValue();
+        reference.incrRef();
+        dataBlockFileList.remove(dataBlockFileList.firstEntry().getKey());
+        DataFile datafile = reference.getInstance();
+        manifest.LastReadDataFile = datafile.getGenericFile().getName();
 
-        sync();
+        syncMeta();
         return datafile;
     }
 
     public DataFile getNewestDataFile() {
-        return dataBlockFileList.getLast().getInstance();
+        return dataBlockFileList.lastEntry().getValue().getInstance();
     }
 
-    public DataFile getLatestDataFile() {
-        return dataBlockFileList.getFirst().getInstance();
-    }
 
     public FileCleanupDeleter getDeleter() {
         return deleter;
-    }
-
-    public AsyncIOFlusher getFlusher() {
-        return flusher;
     }
 
     public void release(DataFile fileHandle) {
 
     }
 
-    public void sync() {
+    public void syncMeta() {
         manifest.DataFileCount = dataBlockFileList.size();
         manifest.LastSyncTime = new Date().toString();
         manifest.sync();

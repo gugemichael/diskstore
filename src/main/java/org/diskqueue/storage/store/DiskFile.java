@@ -7,9 +7,11 @@ import java.io.File;
  */
 public abstract class DiskFile {
     protected final File thisFile;
+    protected final FileStatus fileStatus;
 
-    public DiskFile(File file) {
+    public DiskFile(File file, FileStatus fileStatus) {
         this.thisFile = file;
+        this.fileStatus = fileStatus;
     }
 
     public File getGenericFile() {
@@ -17,6 +19,4 @@ public abstract class DiskFile {
     }
 
     public abstract void sync();
-
-    public abstract boolean checkout();
 }

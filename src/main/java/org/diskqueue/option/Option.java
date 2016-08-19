@@ -1,12 +1,11 @@
 package org.diskqueue.option;
 
+public class Option<T> {
 
-public class Options<T> {
-
-    // default value for every option
+    // default value for every get
     private final T defaultValue;
 
-    public Options(T defaultValue) {
+    public Option(T defaultValue) {
         this.defaultValue = defaultValue;
     }
 
@@ -16,39 +15,37 @@ public class Options<T> {
 
     /**
      * take sync operation with the following policy
-     *
+     * <p>
      * NONE,                     don't take sync behaviour. depends on system flush
      * BLOCK,                   sync with every Block fills up
      * EVERY_SECOND,      sync every second
+     *
      */
-    public static Options<Syncer> SYNC = new Options<>(Syncer.EVERY_SECOND);
+    public static Option<Syncer> SYNC = new Option<>(Syncer.EVERY_SECOND);
 
     /**
      * a folder path that includes manifest and data files
      *
      */
-    public static Options<String> DATA_PATH = new Options<>("./");
+    public static Option<String> DATA_PATH = new Option<>("./");
 
     /**
      * name of the queue. used to create folder name if storage is file backend
      *
      */
-    public static Options<String> NAME = new Options<>("diskqueue");
+    public static Option<String> NAME = new Option<>("diskqueue");
 
     /**
      * storage type .
      *
      * @see StorageType
      */
-    public static Options<StorageType> STORAGE = new Options<>(StorageType.PERSISTENCE);
+    public static Option<StorageType> STORAGE = new Option<>(StorageType.PERSISTENCE);
 
     /**
-     * byteorder of storage file binary stream
+     * recover from the prevois status with file underlay storage while restart
      *
      */
-//    public static Options<ByteOrder> BYTE_ORDER= new Options<>(ByteOrder.BIG_ENDIAN);
-
-
-    public static Options<Boolean> RECOVERY = new Options<>(Boolean.TRUE);
+    public static Option<Boolean> RECOVERY = new Option<>(Boolean.TRUE);
 }
 

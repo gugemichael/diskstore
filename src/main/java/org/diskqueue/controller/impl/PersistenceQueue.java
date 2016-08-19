@@ -1,13 +1,13 @@
 package org.diskqueue.controller.impl;
 
-import org.diskqueue.controller.DiskQueue;
+import org.diskqueue.controller.StorageQueue;
 import org.diskqueue.storage.Storage;
 import org.diskqueue.storage.block.Record;
 
 import java.util.Iterator;
 import java.util.NoSuchElementException;
 
-public class PersistenceQueue<E> extends DiskQueue<E> {
+public class PersistenceQueue<E> extends StorageQueue<E> {
 
     // the name of the Queue
     private final String queueName;

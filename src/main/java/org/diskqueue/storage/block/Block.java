@@ -55,9 +55,10 @@ public class Block {
     //  |   4byte   |     n bytes   |
     //  | ---------- | ------------- |
     //
-    public boolean append(Slice slice) {
+    public boolean write(Slice slice) {
         if (ensureCapacity(slice.size + 4)) {
-            buffer.putInt(slice.body.length);
+//            buffer.putInt(slice.body.length);
+            buffer.putInt(0x11111111);
             buffer.put(slice.body);
             return true;
         } else
@@ -82,6 +83,11 @@ public class Block {
 
     public void froze() {
         header.setFrozen(BlockHeader.BLOCK_FROZEN);
+    }
+
+    public boolean remain() {
+        // take a look if there has more slices
+        return buffer.getInt(buffer.position()) != 0;
     }
 
     public BlockHeader getHeader() {

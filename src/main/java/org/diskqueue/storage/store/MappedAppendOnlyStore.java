@@ -1,5 +1,7 @@
 package org.diskqueue.storage.store;
 
+import org.diskqueue.controller.Configure;
+import org.diskqueue.option.Option;
 import org.diskqueue.option.Syncer;
 import org.diskqueue.storage.FileManager;
 import org.diskqueue.storage.Storage;
@@ -9,15 +11,16 @@ import java.io.File;
 import java.io.IOException;
 
 /**
- * MMaped store for handling mmap file I/O
+ * MMaped store for handling New file I/O
  */
 public class MappedAppendOnlyStore implements AppendOnlyStore {
     // parent storage
     private final Storage storage;
     private boolean recovery;
-
     // all files manager
     private FileManager fileManager;
+
+    private final Configure configure;
 
     // file handle
     private FileHandle fileIO;
@@ -25,14 +28,18 @@ public class MappedAppendOnlyStore implements AppendOnlyStore {
     private Flusher flusher;
     private Syncer syncer;
 
-    public MappedAppendOnlyStore(Storage storage) {
+    public MappedAppendOnlyStore(Storage storage, Configure configure) {
         this.storage = storage;
+        this.recovery = configure.get(Option.RECOVERY);
+        this.syncer = configure.get(Option.SYNC);
+        this.configure = configure;
+        initialize(configure.get(Option.DATA_PATH), configure.get(Option.NAME));
     }
 
     @Override
     public void writeAppend(Slice slice) {
         try {
-            fileIO.write(slice);
+            fileIO.append(slice);
             flusher.flushAll();
         } catch (IOException ignored) {
             ignored.printStackTrace();
@@ -42,16 +49,6 @@ public class MappedAppendOnlyStore implements AppendOnlyStore {
     @Override
     public Slice fetch() {
         return null;
-    }
-
-    public MappedAppendOnlyStore recovery(boolean recovery) {
-        this.recovery = recovery;
-        return this;
-    }
-
-    public MappedAppendOnlyStore syncer(Syncer syncer) {
-        this.syncer = syncer;
-        return this;
     }
 
     public MappedAppendOnlyStore initialize(String pathName, String name) {
@@ -64,7 +61,7 @@ public class MappedAppendOnlyStore implements AppendOnlyStore {
 
             // build file management from this full path foler
             this.fileManager = FileManager.build(fullpath, recovery);
-            this.fileIO = new FileHandle(fileManager);
+            this.fileIO = new FileHandle(fileManager, configure);
             this.flusher = Flusher.policy(fileIO, syncer);
 
             return this;

@@ -2,6 +2,8 @@ package org.diskqueue.storage.block;
 
 import org.diskqueue.storage.FileManager;
 import org.diskqueue.storage.store.DiskFile;
+import org.diskqueue.storage.store.FileStatus;
+import org.diskqueue.utils.FileUtils;
 import org.diskqueue.utils.RefCount;
 
 import java.io.File;
@@ -16,7 +18,7 @@ import static org.diskqueue.storage.block.DataFileHeader.DATA_BLOCK_HEADER_LENGT
 /**
  * Files which contain BlockHeader and Blocks
  */
-public class DataFile extends DiskFile implements RefCount {
+public class DataFile extends DiskFile implements Comparable, RefCount {
     public static final int DATA_BLOCK_FILE_SIZE = 512 * 1024 * 1024;
     public static final int MAX_BLOCK_COUNT = (DATA_BLOCK_FILE_SIZE - DATA_BLOCK_HEADER_LENGTH) / BLOCK_SIZE;
 
@@ -26,7 +28,7 @@ public class DataFile extends DiskFile implements RefCount {
     // header of the file
     private DataFileHeader header = new DataFileHeader();
     // in memory block
-    private volatile Block presentBlock;
+    private volatile Block memoryBlock;
     // data file sequence number
     private final int fileNumber;
 
@@ -34,28 +36,65 @@ public class DataFile extends DiskFile implements RefCount {
     private FileChannel mmapFileChannel;
     private MappedByteBuffer mmapBuffer;
 
-    public DataFile(FileManager fileManager, File mmappedFile) {
-        super(mmappedFile);
+    private DataFile(FileManager fileManager, File mmappedFile, FileStatus fileStatus) {
+        super(mmappedFile, fileStatus);
         this.fileManager = fileManager;
-        this.fileNumber = Integer.parseInt(mmappedFile.getName().split("\\.")[2]);
+        this.fileNumber = FileUtils.getFileNumber(mmappedFile.getName());
     }
 
-    public Block getBlock() {
-        return this.presentBlock;
+    public static DataFile New(FileManager fileManager, File mmappedFile) throws IOException {
+        return new DataFile(fileManager, mmappedFile, FileStatus.WRITE).mmap();
+    }
+
+    public static DataFile load(FileManager fileManager, File mmappedFile) throws IOException {
+        return new DataFile(fileManager, mmappedFile, FileStatus.READ).mmap();
+    }
+
+    private DataFile mmap() throws IOException {
+        if (!thisFile.exists()) {
+            if (fileStatus == FileStatus.READ || !thisFile.createNewFile())
+                throw new IOException(String.format("create non-exist data file failed : %s", thisFile.getName()));
+        }
+
+        if (!thisFile.canRead())
+            throw new IOException(String.format("data file read access violate : %s", thisFile.getName()));
+
+        // TODO : ftruncate the file. this operation don't fill zero into the file
+        RandomAccessFile accessable = new RandomAccessFile(thisFile, "rw");
+        if (fileStatus == FileStatus.WRITE)
+            accessable.setLength(DATA_BLOCK_FILE_SIZE);
+        // make channel
+        mmapFileChannel = accessable.getChannel();
+        // mount entire file to New byte array buffer
+        mmapBuffer = mmapFileChannel.map(FileChannel.MapMode.READ_WRITE, 0, thisFile.length());
+
+        // parse datafile header
+        byte[] headerBits = new byte[DATA_BLOCK_HEADER_LENGTH];
+        mmapBuffer.get(headerBits);
+        header.decode(headerBits);
+
+        switch (fileStatus) {
+        case READ:
+            if (header.getReadOffset() != 0)
+                mmapBuffer.position(header.getReadOffset());
+            break;
+        case WRITE:
+            if (header.getWriteOffset() != 0)
+                mmapBuffer.position(header.getWriteOffset());
+            break;
+        }
+
+        return this;
     }
 
     public Block nextBlock() {
         if (header.getBlockCount() + 1 <= MAX_BLOCK_COUNT) {
-            // flush previous block into disk
-            if (presentBlock != null) {
-                header.setBlockCount(header.getBlockCount() + 1);
-                header.writeable();
-                mmapBuffer.put(presentBlock.getMemory());
-//                sync();
-            }
-
-            presentBlock = Block.create();
-            return presentBlock;
+            if (memoryBlock != null)
+                mmapBuffer.put(memoryBlock.getMemory());
+            header.setBlockCount(header.getBlockCount() + 1);
+            header.writeable();
+            memoryBlock = Block.create();
+            return memoryBlock;
         }
 
         return null;
@@ -65,46 +104,34 @@ public class DataFile extends DiskFile implements RefCount {
         return null;
     }
 
+    @Override
+    public boolean equals(Object o) {
+        if (this == o) return true;
+        if (o == null || getClass() != o.getClass()) return false;
+        DataFile dataFile = (DataFile) o;
+        return fileNumber == dataFile.fileNumber && fileStatus == dataFile.fileStatus;
+    }
+
+    @Override
+    public int hashCode() {
+        return fileNumber * fileStatus.ordinal();
+    }
 
     @Override
     public synchronized void sync() {
+        assert (fileStatus == FileStatus.WRITE);
         // flush header
         int now = mmapBuffer.position();
         mmapBuffer.position(0);
         mmapBuffer.put(header.encode());
-        // flush block
+        // sync the being flushed block
         mmapBuffer.force();
         mmapBuffer.position(now);
     }
 
     @Override
-    public boolean checkout() {
-        try {
-            if (!thisFile.exists() && !thisFile.createNewFile())
-                throw new IOException(String.format("load non-exist and create data file failed : %s", thisFile.getName()));
-
-            if (thisFile.canRead() && thisFile.canWrite()) {
-                // TODO : ftruncate the file. this operation don't fill zero into the file
-                RandomAccessFile accessable = new RandomAccessFile(thisFile, "rw");
-                accessable.setLength(DATA_BLOCK_FILE_SIZE);
-                // make channel
-                mmapFileChannel = accessable.getChannel();
-                // mount entire file to mmap byte array buffer
-                mmapBuffer = mmapFileChannel.map(FileChannel.MapMode.READ_WRITE, 0, thisFile.length());
-
-                // parse datafile header
-                byte[] headerBits = new byte[DATA_BLOCK_HEADER_LENGTH];
-                mmapBuffer.get(headerBits);
-
-                header.decode(headerBits);
-
-                return true;
-            } else
-                return false;
-        } catch (IOException e) {
-            e.printStackTrace();
-            return false;
-        }
+    public int compareTo(Object other) {
+        return this.fileNumber - ((DataFile) other).fileNumber;
     }
 
     @Override

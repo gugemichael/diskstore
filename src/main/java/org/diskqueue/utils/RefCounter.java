@@ -10,13 +10,19 @@ public class RefCounter<T extends RefCount> {
         this.instance = instance;
     }
 
-    public void incrRef() {
+    public RefCounter<T> incrRef() {
         this.count.incrementAndGet();
+        return this;
     }
 
-    public void decrRef() {
+    public RefCounter<T> decrRef() {
         if (this.count.decrementAndGet() == 0)
             instance.recyle();
+        return this;
+    }
+
+    public int getRefCount() {
+        return this.count.intValue();
     }
 
     public T getInstance() {
