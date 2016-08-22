@@ -25,22 +25,19 @@ public class BlockHeader {
         startPosition = buffer.position();
         // check header
         if (forRead) {
-//                assert (buffer.getInt(startPosition + CHECKSUM_OFFSET) != 0);
-            if (getSliceCount() != 16131 || getChecksum() == 0) {
-                byte[] h = new byte[BLOCK_HEADER_SIZE];
-                int pos = buffer.position();
-                System.out.println(buffer.position());
-                buffer.get(h);
-                buffer.position(pos);
-                for (byte b : h) {
-                    System.out.print(b);
-                    System.out.print(",");
-                }
-                System.out.println();
+            byte[] h = new byte[BLOCK_HEADER_SIZE];
+            System.out.println(buffer.position());
+            buffer.get(h);
+            buffer.position(startPosition);
+            for (byte b : h) {
+                System.out.print(b);
+                System.out.print(",");
             }
+            System.out.println();
         } else {
             // setBlockNumber(Block.blockNumber.getAndIncrement());
             setBlockNumber(0xAAAAAAAA);
+            setChecksum(0x33333322);
         }
         return true;
     }

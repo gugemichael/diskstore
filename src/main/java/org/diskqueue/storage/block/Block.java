@@ -8,7 +8,7 @@ import static org.diskqueue.storage.block.BlockHeader.BLOCK_HEADER_SIZE;
 
 public class Block {
     // Fixed block size
-    public static int BLOCK_SIZE = 4 * 1024 * 1024;
+    public static final int BLOCK_SIZE = 4 * 1024 * 1024;
     // Block sequence bumber
     public static final AtomicInteger blockNumber = new AtomicInteger();
 
@@ -17,6 +17,8 @@ public class Block {
 
     // block memory
     private ByteBuffer buffer;
+    // indicate writeable or read only
+    private boolean readOnly;
 
     private int remainSize = BLOCK_SIZE - BLOCK_HEADER_SIZE;
 
@@ -27,7 +29,9 @@ public class Block {
     }
 
     static Block with(ByteBuffer underlayer, boolean forRead) {
+        assert (underlayer.remaining() >= BLOCK_SIZE);
         Block block = new Block();
+        block.readOnly = forRead;
         // initial and write the blockHeader area
         block.blockHeader.from(underlayer, forRead);
         underlayer.position(underlayer.position() + BLOCK_HEADER_SIZE);
@@ -45,6 +49,7 @@ public class Block {
     //  | ---------- | ------------- |
     //
     public boolean write(Slice slice) {
+        assert (!readOnly);
         int need = slice.size + 4;
         if (ensureCapacity(need)) {
             blockHeader.incrSliceCount();
@@ -63,6 +68,7 @@ public class Block {
     }
 
     public Slice fetch() {
+        assert (readOnly);
         if (buffer.remaining() > 4) {
             int len = buffer.getInt();
             if (buffer.remaining() >= len) {
@@ -102,14 +108,7 @@ public class Block {
 
     public boolean hasMore() {
         // take a look if there has more slices
-        try {
-            return buffer.getInt(buffer.position()) != 0;
-        } catch (IndexOutOfBoundsException e) {
-            e.printStackTrace();
-            System.err.println(buffer.capacity() + " " + buffer.position());
-            System.exit(-1);
-            return false;
-        }
+        return buffer.getInt(buffer.position()) != 0;
     }
 
     public BlockHeader getBlockHeader() {

@@ -1,5 +1,7 @@
 package org.diskqueue.storage.block;
 
+import org.diskqueue.option.Option;
+import org.diskqueue.option.Syncer;
 import org.diskqueue.storage.FileManager;
 import org.diskqueue.storage.store.DiskFile;
 import org.diskqueue.storage.store.FileStatus;
@@ -101,8 +103,17 @@ public class DataFile extends DiskFile implements Comparable, RefCount {
 
         fileHeader.writeable();
         // fix and update the previous one's fileHeader information
-        if (memoryBlock != null)
+        if (memoryBlock != null) {
+            assert (memoryBlock.isFrozen());
             memoryBlock.getBlockHeader().setChecksum(0x22222233); // memoryBlock.getBlockHeader().setChecksum(memoryBlock.checksum());
+
+            // we successfully get the next Block. next we write the previous
+            // one to disk and flush the dirty page
+            if (fileManager.getConfigure().get(Option.SYNC) == Syncer.BLOCK) {
+                System.err.println("2 -------------------------");
+                sync();
+            }
+        }
 
         if (fileHeader.getBlockUsed() + 1 <= MAX_BLOCK_COUNT) {
             fileHeader.setBlockUsed(fileHeader.getBlockUsed() + 1);
@@ -120,7 +131,7 @@ public class DataFile extends DiskFile implements Comparable, RefCount {
 
     public Block nextReadBlock() {
         System.out.println("[[[[ next read block of " + getGenericFile().getName() + "]]]]]");
-//        assert (fileStatus == FileStatus.READ);
+        assert (fileStatus == FileStatus.READ);
         // there is no more block in this file
         if (!moveToNextBlock()) {
             System.out.println("======= file end ======");
@@ -146,8 +157,6 @@ public class DataFile extends DiskFile implements Comparable, RefCount {
                 : 0;
 
         // no more block at the tail
-        if (mmapBuffer.position() + skip >= mmapBuffer.capacity())
-            return false;
         if (mmapBuffer.position() + skip + BLOCK_SIZE > mmapBuffer.capacity())
             return false;
 

@@ -60,8 +60,8 @@ public class MappedAppendOnlyStore implements AppendOnlyStore {
                 throw new IOException("storage folder path isn't valid");
 
             // build file management from this full path foler
-            this.fileManager = FileManager.build(fullpath, recovery);
-            this.fileIO = new FileHandle(fileManager, configure);
+            this.fileManager = FileManager.build(configure, fullpath, recovery);
+            this.fileIO = new FileHandle(fileManager);
             this.flusher = Flusher.policy(fileIO, syncer);
 
             return this;

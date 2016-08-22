@@ -30,11 +30,11 @@ public class FileHandle implements Flushable {
     private volatile Block writeBlock;
     private volatile Block readBlock;
 
-    FileHandle(FileManager fileManager, Configure configure) {
+    FileHandle(FileManager fileManager) {
         this.fileManager = fileManager;
+        this.configure = fileManager.getConfigure();
         this.newest = fileManager.getNewestDataFile();
         this.earliest = fileManager.getEarliestDataFile();
-        this.configure = configure;
     }
 
     public void append(Slice slice) {
@@ -53,9 +53,13 @@ public class FileHandle implements Flushable {
 
             // we successfully get the next Block. next we write the previous
             // one to disk and flush the dirty page
-            if (configure.get(Option.SYNC) == Syncer.BLOCK)
+            if (configure.get(Option.SYNC) == Syncer.BLOCK) {
+                System.err.println("1 -------------------------");
                 newest.sync();
+            }
         }
+
+        assert (retry == 7);
     }
 
     private boolean ensureWriteableBlock() {
@@ -97,7 +101,7 @@ public class FileHandle implements Flushable {
         // check if the block has been frozen. may be we should
         // peek the next block from now
         if ((readBlock = earliest.nextReadBlock()) == null) {
-            System.out.println("earliest next " + earliest.toString());
+            System.out.println("complete earliest " + earliest.getGenericFile().getName());
             DataFile next = fileManager.getEarliestDataFile();
             if (next != null) {
                 // now we should release the earliest data file

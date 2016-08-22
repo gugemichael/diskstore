@@ -1,5 +1,6 @@
 package org.diskqueue.storage;
 
+import org.diskqueue.controller.Configure;
 import org.diskqueue.storage.block.DataFile;
 import org.diskqueue.storage.meta.Manifest;
 import org.diskqueue.utils.FileUtils;
@@ -39,13 +40,19 @@ public class FileManager {
     // consumed (refcount equals zero) files
     private final FileCleanupDeleter deleter = new FileCleanupDeleter();
 
-    public static FileManager build(File folder) throws IOException {
-        return build(folder, true);
+    private final Configure configure;
+
+    private FileManager(Configure configure) {
+        this.configure = configure;
     }
 
-    public static FileManager build(File folder, boolean recovery) throws IOException {
+    public static FileManager build(Configure configure, File folder) throws IOException {
+        return build(configure, folder, true);
+    }
+
+    public static FileManager build(Configure configure, File folder, boolean recovery) throws IOException {
         // new instance from current path
-        final FileManager fileManager = new FileManager();
+        final FileManager fileManager = new FileManager(configure);
 
         fileManager.deleter.start();
 
@@ -169,5 +176,9 @@ public class FileManager {
         manifest.DataFileCount = readDataFileSet.size();
         manifest.LastSyncTime = new Date().toString();
         manifest.sync();
+    }
+
+    public Configure getConfigure() {
+        return configure;
     }
 }
