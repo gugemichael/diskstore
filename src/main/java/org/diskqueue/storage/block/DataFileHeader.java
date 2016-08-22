@@ -25,14 +25,9 @@ public class DataFileHeader {
     private int startPosition = 0;
 
     public boolean from(ByteBuffer buffer) {
-        if (buffer.capacity() >= DATA_BLOCK_HEADER_SIZE) {
-            this.buffer = buffer;
-            startPosition = buffer.position();
-            // check header
-            return true;
-        }
-
-        return false;
+        this.buffer = buffer;
+        startPosition = buffer.position();
+        return true;
     }
 
 

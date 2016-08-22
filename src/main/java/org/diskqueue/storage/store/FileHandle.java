@@ -5,6 +5,7 @@ import org.diskqueue.option.Option;
 import org.diskqueue.option.Syncer;
 import org.diskqueue.storage.FileManager;
 import org.diskqueue.storage.block.Block;
+import org.diskqueue.storage.block.BlockHeader;
 import org.diskqueue.storage.block.DataFile;
 import org.diskqueue.storage.block.Slice;
 
@@ -48,6 +49,8 @@ public class FileHandle implements Flushable {
 
             writeBlock.froze();
 
+            assert (writeBlock.getBlockHeader().getFrozen() == BlockHeader.BLOCK_FROZEN);
+
             // we successfully get the next Block. next we write the previous
             // one to disk and flush the dirty page
             if (configure.get(Option.SYNC) == Syncer.BLOCK)
@@ -62,6 +65,7 @@ public class FileHandle implements Flushable {
         if (writeBlock == null || writeBlock.isFrozen()) {
             if ((writeBlock = newest.nextWriteBlock()) == null) {
                 try {
+                    newest.sync();
                     // allocate new data file because of there has no more space
                     newest = fileManager.createDataFile();
                     writeBlock = newest.nextWriteBlock();

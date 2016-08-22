@@ -10,16 +10,16 @@ import java.util.concurrent.locks.ReentrantLock;
 
 /**
  * Disk file clean up thread.
- * <p>
+ *
  * Delete files on Linux file system with ext3 or later. ext3 will approximately block
  * for a long time while removing a big normal file. discuss at :
- * <p>
+ *
  * http://serverfault.com/questions/128012/how-to-make-rm-faster-on-ext3-linux
- * <p>
+ *
  * therefore, we provide a seperate standalone thread to acompulish
  */
 public class FileCleanupDeleter extends Hypervisor {
-    private static final boolean onlyMarkedRemove = true;
+    private static final boolean onlyMarkedRemove = false;
 
     // tasks of file is being deleted
     private BlockingQueue<File> toBeDeleted = new LinkedBlockingQueue<>();
@@ -37,12 +37,7 @@ public class FileCleanupDeleter extends Hypervisor {
         File delete = null;
         try {
             for (; ; ) {
-                delete = toBeDeleted.take();
-                lock.lock();
-                if (!onlyMarkedRemove)
-                    delete.delete();
-                wait.signalAll();
-                lock.unlock();
+                delete(toBeDeleted.take());
             }
 
         } catch (InterruptedException e) {
@@ -54,27 +49,25 @@ public class FileCleanupDeleter extends Hypervisor {
     public boolean asyncDelete(File[] files, boolean waitCompleted) {
         // rename first
         for (File file : files) {
+            // rename is vary fast !
             File renamed = new File(String.format("%s.deleted", file.getAbsolutePath()));
             if (!file.renameTo(renamed))
                 System.err.println("data file rename failed : " + renamed.getAbsoluteFile());
-            toBeDeleted.offer(renamed);
+
+            // wait all above inserted file elements for complete
+            if (waitCompleted)
+                delete(file);
+            else
+                toBeDeleted.offer(renamed);
         }
 
-        // wait all above inserted file elements for complete
-        if (waitCompleted) {
-            lock.lock();
-            if (!toBeDeleted.isEmpty()) {
-                try {
-                    wait.await();
-                    return true;
-                } catch (InterruptedException e) {
-                    return false;
-                } finally {
-                    lock.unlock();
-                }
-            }
-        }
 
         return true;
     }
+
+    private void delete(File delete) {
+        if (!onlyMarkedRemove)
+            delete.delete();
+    }
+
 }

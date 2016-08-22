@@ -48,12 +48,18 @@ public class Block {
         int need = slice.size + 4;
         if (ensureCapacity(need)) {
             blockHeader.incrSliceCount();
-            buffer.putInt(slice.body.length);
+            // write the content firstly that we could prevent the
+            // reader see the *length* field. but the content has
+            // not entirely written. like a partitial write
+            int now = buffer.position();
+            buffer.position(now + 4);
             buffer.put(slice.body);
+            buffer.putInt(now, slice.body.length);
             remainSize -= need;
             return true;
-        } else
+        } else {
             return false;
+        }
     }
 
     public Slice fetch() {

@@ -119,7 +119,7 @@ public class DataFile extends DiskFile implements Comparable, RefCount {
     }
 
     public Block nextReadBlock() {
-        System.out.println("[[[[ next read block of " + getGenericFile().getName() +  "]]]]]");
+        System.out.println("[[[[ next read block of " + getGenericFile().getName() + "]]]]]");
 //        assert (fileStatus == FileStatus.READ);
         // there is no more block in this file
         if (!moveToNextBlock()) {
@@ -183,11 +183,15 @@ public class DataFile extends DiskFile implements Comparable, RefCount {
     @Override
     public void release() {
         // release file descriptor
+        close();
+        fileManager.getDeleter().asyncDelete(new File[]{getGenericFile()}, false);
+    }
+
+    public void close() {
         try {
             mmapFileChannel.close();
             // TODO : invoke cleaner
             mmapBuffer = null;
-            fileManager.getDeleter().asyncDelete(new File[]{getGenericFile()}, false);
         } catch (IOException e) {
             e.printStackTrace();
         }

@@ -56,7 +56,7 @@ public class SimpleStore {
                                 for (int l = 0; l != slice.body.length; l++)
                                     System.err.print(slice.body[l]);
                                 System.err.println();
-
+                                System.exit(-1);
                             }
                         }
                         sum++;
