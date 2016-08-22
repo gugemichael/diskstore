@@ -6,7 +6,7 @@ import java.nio.ByteBuffer;
  * Header of the datafile {@link DataFile}
  */
 public class DataFileHeader {
-    public static final int DATA_BLOCK_HEADER_LENGTH = 4 * 1024;
+    public static final int DATA_BLOCK_HEADER_SIZE = 4 * 1024;
 
     public static final int STATUS_WRITE = 1;
     public static final int STATUS_READ = 2;
@@ -16,93 +16,75 @@ public class DataFileHeader {
     /**
      * metadata header show details of the datafile
      */
-    private int blockCount;
-    private int startBlockNumber;
-    private int status;          // 1 is write, 2 is read, 4 is conrrupt, 8 is dead
-    private int readOffset = -1;
-    private int writeOffset = -1;
+    private static final int BLOCK_USED_OFFSET = 0;
+    private static final int START_BLOCK_NUMBER_OFFSET = 4;
+    private static final int STATUS_OFFSET = 8;         // 1 is write, 2 is read, 4 is conrrupt, 8 is dead
+    private static final int READ_OFFSET = 12;
 
-    // padding with zero and align to 16 byte
-    private byte[] padding = new byte[DATA_BLOCK_HEADER_LENGTH - 20];
+    private ByteBuffer buffer;
+    private int startPosition = 0;
 
-    public boolean decode(byte[] bits) {
-        if (bits.length >= DATA_BLOCK_HEADER_LENGTH) {
-            // read header
-            ByteBuffer buffer = ByteBuffer.wrap(bits);
-            blockCount = buffer.getInt();
-            startBlockNumber = buffer.getInt();
-            status = buffer.getInt();
-            readOffset = buffer.getInt();
-            writeOffset = buffer.getInt();
-//            assert (status <= STATUA_DEAD && status >= STATUS_WRITE);
-            // discard the left padding bytes
+    public boolean from(ByteBuffer buffer) {
+        if (buffer.capacity() >= DATA_BLOCK_HEADER_SIZE) {
+            this.buffer = buffer;
+            startPosition = buffer.position();
+            // check header
             return true;
         }
 
         return false;
     }
 
-    public byte[] encode() {
-        ByteBuffer buffer = ByteBuffer.allocate(DATA_BLOCK_HEADER_LENGTH);
-        buffer.putInt(blockCount);
-        buffer.putInt(startBlockNumber);
-        buffer.putInt(status);
-        buffer.putInt(readOffset);
-        buffer.putInt(writeOffset);
-        buffer.put(padding);
-        assert (buffer.position() == DATA_BLOCK_HEADER_LENGTH);
-        return buffer.array();
+
+    public int getBlockUsed() {
+        return buffer.getInt(startPosition + BLOCK_USED_OFFSET);
     }
 
-    public int getBlockCount() {
-        return blockCount;
-    }
-
-    public void setBlockCount(int blockCount) {
-        this.blockCount = blockCount;
+    public void setBlockUsed(int blockUsed) {
+        buffer.putInt(startPosition + BLOCK_USED_OFFSET, blockUsed);
     }
 
     public int getStartBlockNumber() {
-        return startBlockNumber;
+        return buffer.getInt(startPosition + START_BLOCK_NUMBER_OFFSET);
     }
 
     public void setStartBlockNumber(int startBlockNumber) {
-        this.startBlockNumber = startBlockNumber;
+        buffer.putInt(startPosition + START_BLOCK_NUMBER_OFFSET, startBlockNumber);
+    }
+
+    public int getStatus() {
+        return buffer.getInt(startPosition + STATUS_OFFSET);
+    }
+
+    private void setStatus(int status) {
+        buffer.putInt(startPosition + STATUS_OFFSET, status);
     }
 
     public void writeable() {
-        this.status |= STATUS_WRITE;
+        setStatus(getStatus() | STATUS_WRITE);
     }
 
     public void unwriteable() {
-        this.status &= ~STATUS_WRITE;
+        setStatus(getStatus() & ~STATUS_WRITE);
     }
 
     public void readble() {
-        this.status |= STATUS_READ;
+        setStatus(getStatus() | STATUS_READ);
     }
 
     public void unreadble() {
-        this.status &= ~STATUS_READ;
+        setStatus(getStatus() & ~STATUS_READ);
     }
 
     public void dead() {
-        this.status = STATUA_DEAD;
+        setStatus(STATUA_DEAD);
     }
 
     public int getReadOffset() {
-        return readOffset;
+        return buffer.getInt(startPosition + READ_OFFSET);
     }
 
     public void setReadOffset(int readOffset) {
-        this.readOffset = readOffset;
-    }
-
-    public int getWriteOffset() {
-        return writeOffset;
-    }
-
-    public void setWriteOffset(int writeOffset) {
-        this.writeOffset = writeOffset;
+        buffer.putInt(startPosition + READ_OFFSET, readOffset);
     }
 }

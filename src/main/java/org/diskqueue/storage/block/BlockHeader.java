@@ -3,67 +3,90 @@ package org.diskqueue.storage.block;
 import java.nio.ByteBuffer;
 
 public class BlockHeader {
-    public static final int BLOCK_HEADER_LENGTH = 16;
+    public static final int BLOCK_HEADER_SIZE = 16;
 
     public static final int BLOCK_WRITEABLE = 0;
     public static final int BLOCK_FROZEN = 1;
 
     // number of slice
-    private int sliceCount = 0;
+    private static final int BLOCK_NUMBER_OFFSET = 0;
+    // number of slice
+    private static final int SLICE_COUNT_OFFSET = 4;
     // is already filled up since we can only read this Block
-    private int isFrozen = BLOCK_WRITEABLE;
+    private static final int IS_FROZEN_OFFSET = 8;
     // checksum of the entire Block except this BlockHeader
-    private int checksum = 0;
+    private static final int CHECKSUM_OFFSET = 12;
 
-    private byte[] padding = new byte[4];
+    private ByteBuffer buffer;
+    private int startPosition = 0;
 
-    public boolean decode(byte[] bits) {
-        if (bits.length >= BLOCK_HEADER_LENGTH) {
-            // read header
-            ByteBuffer buffer = ByteBuffer.wrap(bits);
-            sliceCount = buffer.getInt();
-            isFrozen = buffer.getInt();
-            checksum = buffer.getInt();
-            assert (isFrozen == 0 || isFrozen == 1);
-            assert (checksum != 0);
-            // discard the left padding bytes
-            return true;
+    public boolean from(ByteBuffer buffer, boolean forRead) {
+        this.buffer = buffer;
+        startPosition = buffer.position();
+        // check header
+        if (forRead) {
+//                assert (buffer.getInt(startPosition + CHECKSUM_OFFSET) != 0);
+            if (getSliceCount() != 16131 || getChecksum() == 0) {
+                byte[] h = new byte[BLOCK_HEADER_SIZE];
+                int pos = buffer.position();
+                System.out.println(buffer.position());
+                buffer.get(h);
+                buffer.position(pos);
+                for (byte b : h) {
+                    System.out.print(b);
+                    System.out.print(",");
+                }
+                System.out.println();
+            }
+        } else {
+            // setBlockNumber(Block.blockNumber.getAndIncrement());
+            setBlockNumber(0xAAAAAAAA);
         }
-
-        return false;
+        return true;
     }
 
-    public void encode(byte[] bits) {
-        ByteBuffer buffer = ByteBuffer.wrap(bits);
-        buffer.putInt(sliceCount);
-        buffer.putInt(isFrozen);
-        buffer.putInt(checksum);
-        buffer.put(padding);
-        assert (buffer.position() == BLOCK_HEADER_LENGTH);
+    public int getBlockNumber() {
+        return buffer.getInt(startPosition + BLOCK_NUMBER_OFFSET);
     }
 
+    public void setBlockNumber(int blockNumber) {
+        buffer.putInt(startPosition + BLOCK_NUMBER_OFFSET, blockNumber);
+    }
 
     public int getSliceCount() {
-        return sliceCount;
+        return buffer.getInt(startPosition + SLICE_COUNT_OFFSET);
     }
 
     public void setSliceCount(int sliceCount) {
-        this.sliceCount = sliceCount;
+        buffer.putInt(startPosition + SLICE_COUNT_OFFSET, sliceCount);
     }
 
-    public int isFrozen() {
-        return isFrozen;
+    public void incrSliceCount() {
+        buffer.putInt(startPosition + SLICE_COUNT_OFFSET, getSliceCount() + 1);
+    }
+
+    public int getFrozen() {
+        return buffer.getInt(startPosition + IS_FROZEN_OFFSET);
     }
 
     public void setFrozen(int isFrozen) {
-        this.isFrozen = isFrozen;
+        buffer.putInt(startPosition + IS_FROZEN_OFFSET, isFrozen);
     }
 
     public int getChecksum() {
-        return checksum;
+        return buffer.getInt(startPosition + CHECKSUM_OFFSET);
     }
 
     public void setChecksum(int checksum) {
-        this.checksum = checksum;
+        buffer.putInt(startPosition + CHECKSUM_OFFSET, checksum);
+
+    }
+
+    public int getStartPosition() {
+        return startPosition;
+    }
+
+    public void setStartPosition(int startPosition) {
+        this.startPosition = startPosition;
     }
 }

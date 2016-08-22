@@ -48,7 +48,7 @@ public class MappedAppendOnlyStore implements AppendOnlyStore {
 
     @Override
     public Slice fetch() {
-        return null;
+        return fileIO.fetch();
     }
 
     public MappedAppendOnlyStore initialize(String pathName, String name) {

@@ -47,6 +47,11 @@ public class FileHandle implements Flushable {
                 break;
 
             writeBlock.froze();
+
+            // we successfully get the next Block. next we write the previous
+            // one to disk and flush the dirty page
+            if (configure.get(Option.SYNC) == Syncer.BLOCK)
+                newest.sync();
         }
     }
 
@@ -55,36 +60,53 @@ public class FileHandle implements Flushable {
         // to create one new Block. if still null returned we
         // create a new DataFile (data file is incessant)
         if (writeBlock == null || writeBlock.isFrozen()) {
-            if ((writeBlock = newest.nextBlock()) == null) {
+            if ((writeBlock = newest.nextWriteBlock()) == null) {
                 try {
                     // allocate new data file because of there has no more space
                     newest = fileManager.createDataFile();
-                    writeBlock = newest.nextBlock();
+                    writeBlock = newest.nextWriteBlock();
                     return true;
                 } catch (IOException e) {
                     e.printStackTrace();
                     return false;
                 }
             }
-
-            // we successfully get the next Block. next we write the previous
-            // one to disk and flush the dirty page
-            if (configure.get(Option.SYNC) == Syncer.BLOCK)
-                newest.sync();
         }
 
         return true;
     }
 
     public Slice fetch() {
+        findAvailableBlock();
+        if (readBlock != null && readBlock.hasMore())
+            return readBlock.fetch();
+
         return null;        // nothing here
     }
 
     private Block findAvailableBlock() {
-        if (readBlock != null && readBlock.remain())
-            return readBlock;
+        if (readBlock != null) {
+            if (readBlock.hasMore() || !readBlock.isFrozen())
+                return readBlock;
+        }
 
-        return readBlock = earliest.readBlock();
+        // check if the block has been frozen. may be we should
+        // peek the next block from now
+        if ((readBlock = earliest.nextReadBlock()) == null) {
+            System.out.println("earliest next " + earliest.toString());
+            DataFile next = fileManager.getEarliestDataFile();
+            if (next != null) {
+                // now we should release the earliest data file
+                fileManager.release(earliest);
+                earliest = next;
+                // I'm sure that readBlock should not be nullptr
+                readBlock = earliest.nextReadBlock();
+            } else {
+                return null;
+            }
+        }
+
+        return readBlock;
     }
 
 

@@ -17,7 +17,7 @@ public class RefCounter<T extends RefCount> {
 
     public RefCounter<T> decrRef() {
         if (this.count.decrementAndGet() == 0)
-            instance.recyle();
+            instance.release();
         return this;
     }
 

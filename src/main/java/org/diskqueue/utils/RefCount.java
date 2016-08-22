@@ -7,5 +7,5 @@ public interface RefCount {
      * to zero !
      *
      */
-    public void recyle();
+    public void release();
 }

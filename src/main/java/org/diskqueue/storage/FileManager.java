@@ -14,6 +14,9 @@ import java.util.Date;
 import java.util.concurrent.ConcurrentSkipListMap;
 import java.util.concurrent.atomic.AtomicInteger;
 
+import static org.diskqueue.storage.block.DataFile.New;
+import static org.diskqueue.storage.block.DataFile.load;
+
 public class FileManager {
     // manifest and data file name pattern
     public static final String MANIFEST_FILE_NAME = "%s.manifest";
@@ -28,8 +31,9 @@ public class FileManager {
     // manifest metadata file
     private Manifest manifest;
     // data block files
-    private ConcurrentSkipListMap<DataFile, RefCounter<DataFile>> dataBlockFileList = new ConcurrentSkipListMap<>();
-    // private Set<DataFile> fileCache = new ConcurrentSkipListSet<>();
+    private ConcurrentSkipListMap<DataFile, RefCounter<DataFile>> writeDataFileSet = new ConcurrentSkipListMap<>();
+    private ConcurrentSkipListMap<DataFile, RefCounter<DataFile>> readDataFileSet = new ConcurrentSkipListMap<>();
+    private ConcurrentSkipListMap<DataFile, RefCounter<DataFile>> releaseMap = new ConcurrentSkipListMap<>();
 
     // disk file deleter thread who is responsibility for clean up
     // consumed (refcount equals zero) files
@@ -72,15 +76,14 @@ public class FileManager {
         File[] dataBlockList = folder.listFiles(new FilenameFilter() {
             @Override
             public boolean accept(File dir, String name) {
-                return name.startsWith(String.format("%s.block", namespace));
+                return name.startsWith(String.format("%s.block.", namespace)) &&
+                        !name.endsWith("deleted");
             }
         });
 
         if (dataBlockList != null && dataBlockList.length != 0) {
             // do recovery and load persistence file into file cache
-            DataFile[] dataFileArray = new DataFile[dataBlockList.length];
-
-            // sort data file by number
+            // and sort data file by number
             Arrays.sort(dataBlockList, new Comparator<File>() {
                 @Override
                 public int compare(File first, File second) {
@@ -88,21 +91,20 @@ public class FileManager {
                 }
             });
             int i = 0;
-            for (; i < dataBlockList.length - 1; i++)
-                dataFileArray[i] = DataFile.load(fileManager, dataBlockList[i]);
-            // make the latest one writeable
-            dataFileArray[i] = DataFile.New(fileManager, dataBlockList[i]);
-
-
-            // add them to deque
-            for (DataFile file : dataFileArray) {
-                fileManager.dataBlockFileList.put(file, new RefCounter<DataFile>(file));
+            for (; i < dataBlockList.length - 1; i++) {
+                DataFile read = load(fileManager, dataBlockList[i]);
+                fileManager.readDataFileSet.put(read, new RefCounter<DataFile>(read));
             }
+            // make the latest one writeable
+            DataFile write = DataFile.New(fileManager, dataBlockList[i]);
+            DataFile read = load(fileManager, dataBlockList[i]);
+            fileManager.writeDataFileSet.put(write, new RefCounter<DataFile>(write));
+            fileManager.readDataFileSet.put(read, new RefCounter<DataFile>(read));
 
             // we are manpulating the newest one. since we hold its reference
-            fileManager.dataBlockFileList.lastEntry().getValue().incrRef();
-            // fix next number
-            fileManager.nextSequenceFileNumber.set(fileManager.dataBlockFileList.lastEntry().getKey().getFileNumber() + 1);
+            fileManager.writeDataFileSet.lastEntry().getValue().incrRef();
+            // fix next number and global block number
+            fileManager.nextSequenceFileNumber.set(fileManager.writeDataFileSet.lastEntry().getKey().getFileNumber() + 1);
         } else {
             // we create at lease one DataFile
             fileManager.createDataFile();
@@ -111,34 +113,40 @@ public class FileManager {
         // may be sync twice ! but it's OK
         fileManager.syncMeta();
 
-        for (RefCounter<DataFile> ref : fileManager.dataBlockFileList.values())
-            System.out.println(ref.getInstance().getGenericFile().getName() + ", " + ref.getRefCount());
+        for (RefCounter<DataFile> ref : fileManager.writeDataFileSet.values())
+            System.out.println("write set : " + ref.getInstance().getGenericFile().getName() + ", " + ref.getRefCount());
+        for (RefCounter<DataFile> ref : fileManager.readDataFileSet.values())
+            System.out.println("read set : " + ref.getInstance().getGenericFile().getName() + ", " + ref.getRefCount());
 
         return fileManager;
     }
 
     public synchronized DataFile createDataFile() throws IOException {
-        DataFile datafile = DataFile.New(this,
-                new File(String.format("%s/%s.block.%d", folder.getAbsolutePath(), namespace, nextSequenceFileNumber.intValue())));
+        File physical = new File(String.format("%s/%s.block.%d", folder.getAbsolutePath(), namespace, nextSequenceFileNumber.intValue()));
+        DataFile write = New(this, physical);
+        DataFile read = load(this, physical);
         // add to deque and wait to be read
-        dataBlockFileList.put(datafile, new RefCounter<DataFile>(datafile).incrRef());
+        writeDataFileSet.put(write, new RefCounter<DataFile>(write).incrRef());
+        readDataFileSet.put(read, new RefCounter<DataFile>(read));
         // auto increment
         nextSequenceFileNumber.incrementAndGet();
         // fill the last created file
-        manifest.LastCreatedDataFile = datafile.getGenericFile().getName();
+        manifest.LastCreatedDataFile = write.getGenericFile().getName();
 
+        write.sync();
         syncMeta();
-        return datafile;
+        return write;
     }
 
     public synchronized DataFile getEarliestDataFile() {
-        if (dataBlockFileList.isEmpty())
+        if (readDataFileSet.isEmpty())
             return null;
 
         // pop the earliest data file
-        RefCounter<DataFile> reference = dataBlockFileList.firstEntry().getValue();
+        RefCounter<DataFile> reference = readDataFileSet.firstEntry().getValue();
         reference.incrRef();
-        dataBlockFileList.remove(dataBlockFileList.firstEntry().getKey());
+        readDataFileSet.remove(readDataFileSet.firstEntry().getKey());
+        releaseMap.put(reference.getInstance(), reference);
         DataFile datafile = reference.getInstance();
         manifest.LastReadDataFile = datafile.getGenericFile().getName();
 
@@ -147,7 +155,7 @@ public class FileManager {
     }
 
     public DataFile getNewestDataFile() {
-        return dataBlockFileList.lastEntry().getValue().getInstance();
+        return writeDataFileSet.lastEntry().getValue().getInstance();
     }
 
 
@@ -155,12 +163,12 @@ public class FileManager {
         return deleter;
     }
 
-    public void release(DataFile fileHandle) {
-
+    public void release(DataFile datafile) {
+        releaseMap.get(datafile).decrRef();
     }
 
     public void syncMeta() {
-        manifest.DataFileCount = dataBlockFileList.size();
+        manifest.DataFileCount = readDataFileSet.size();
         manifest.LastSyncTime = new Date().toString();
         manifest.sync();
     }

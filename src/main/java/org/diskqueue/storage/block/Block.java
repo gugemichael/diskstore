@@ -1,52 +1,41 @@
 package org.diskqueue.storage.block;
 
 import java.nio.ByteBuffer;
-import java.util.concurrent.atomic.AtomicLong;
+import java.util.concurrent.atomic.AtomicInteger;
+import java.util.zip.CRC32;
+
+import static org.diskqueue.storage.block.BlockHeader.BLOCK_HEADER_SIZE;
 
 public class Block {
     // Fixed block size
     public static int BLOCK_SIZE = 4 * 1024 * 1024;
     // Block sequence bumber
-    public static final AtomicLong blockNumber = new AtomicLong();
+    public static final AtomicInteger blockNumber = new AtomicInteger();
 
     // detail meta data of this Block
-    private BlockHeader header = new BlockHeader();
-    // block memory
-    private byte[] memory;
-//    // elements in the Block. shard underlayer space with Block::memory[]
-//    private Slice[] pieces;
+    private BlockHeader blockHeader = new BlockHeader();
 
+    // block memory
     private ByteBuffer buffer;
 
+    private int remainSize = BLOCK_SIZE - BLOCK_HEADER_SIZE;
+
+    // for checksum calculate
+    private CRC32 crc32 = new CRC32();
 
     private Block() {
     }
 
-    static Block create() {
+    static Block with(ByteBuffer underlayer, boolean forRead) {
         Block block = new Block();
-        // initial and write the header area
-        byte[] inMemory = new byte[Block.BLOCK_SIZE];
-        block.memory = inMemory;
-        block.header.encode(inMemory);
-        block.buffer = ByteBuffer.wrap(block.memory);
+        // initial and write the blockHeader area
+        block.blockHeader.from(underlayer, forRead);
+        underlayer.position(underlayer.position() + BLOCK_HEADER_SIZE);
 
-        // skip the header offset
-        block.buffer.position(BlockHeader.BLOCK_HEADER_LENGTH);
+        // current buffer position has cross over the blockHeader and
+        // moved to data area already. so directly read at this offset
+        block.buffer = underlayer;
         return block;
-    }
-
-    public static Block read(byte[] memory) {
-        Block block = new Block();
-        block.memory = memory;
-        block.header.decode(block.memory);
-        block.buffer = ByteBuffer.wrap(block.memory);
-        // skip the header offset
-        block.buffer.position(BlockHeader.BLOCK_HEADER_LENGTH);
-        return block;
-    }
-
-    boolean ensureCapacity(int size) {
-        return buffer.remaining() >= size;
     }
 
     //  | ---------- | ------------- |
@@ -56,10 +45,12 @@ public class Block {
     //  | ---------- | ------------- |
     //
     public boolean write(Slice slice) {
-        if (ensureCapacity(slice.size + 4)) {
-//            buffer.putInt(slice.body.length);
-            buffer.putInt(0x11111111);
+        int need = slice.size + 4;
+        if (ensureCapacity(need)) {
+            blockHeader.incrSliceCount();
+            buffer.putInt(slice.body.length);
             buffer.put(slice.body);
+            remainSize -= need;
             return true;
         } else
             return false;
@@ -77,32 +68,49 @@ public class Block {
         return null;
     }
 
+    public int checksum() {
+        byte[] content = new byte[BLOCK_SIZE - BLOCK_HEADER_SIZE];
+        int now = buffer.position();
+        buffer.position(blockHeader.getStartPosition() + BLOCK_HEADER_SIZE);
+        buffer.get(content, 0, content.length);
+        buffer.position(now);
+
+        crc32.update(content);
+        int value = (int) crc32.getValue();
+        crc32.reset();
+        return value;
+    }
+
+
+    private boolean ensureCapacity(int size) {
+        return remainSize >= size;
+    }
+
     public boolean isFrozen() {
-        return header.isFrozen() == BlockHeader.BLOCK_FROZEN;
+        return blockHeader.getFrozen() == BlockHeader.BLOCK_FROZEN;
     }
 
     public void froze() {
-        header.setFrozen(BlockHeader.BLOCK_FROZEN);
+        blockHeader.setFrozen(BlockHeader.BLOCK_FROZEN);
     }
 
-    public boolean remain() {
+    public boolean hasMore() {
         // take a look if there has more slices
-        return buffer.getInt(buffer.position()) != 0;
+        try {
+            return buffer.getInt(buffer.position()) != 0;
+        } catch (IndexOutOfBoundsException e) {
+            e.printStackTrace();
+            System.err.println(buffer.capacity() + " " + buffer.position());
+            System.exit(-1);
+            return false;
+        }
     }
 
-    public BlockHeader getHeader() {
-        return header;
+    public BlockHeader getBlockHeader() {
+        return blockHeader;
     }
 
-    public void setHeader(BlockHeader header) {
-        this.header = header;
-    }
-
-    public byte[] getMemory() {
-        return memory;
-    }
-
-    public void setMemory(byte[] memory) {
-        this.memory = memory;
+    public int getRemainSize() {
+        return remainSize;
     }
 }
