@@ -54,7 +54,6 @@ public class FileHandle implements Flushable {
             // we successfully get the next Block. next we write the previous
             // one to disk and flush the dirty page
             if (configure.get(Option.SYNC) == Syncer.BLOCK) {
-                System.err.println("1 -------------------------");
                 newest.sync();
             }
         }

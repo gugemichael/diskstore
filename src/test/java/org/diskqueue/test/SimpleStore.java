@@ -72,7 +72,7 @@ public class SimpleStore {
 
         Thread w = new Writer();
         Thread r = new Reader("Reader");
-//        w.start();
+        w.start();
         r.start();
 
         w.join();

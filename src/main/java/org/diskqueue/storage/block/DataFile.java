@@ -87,7 +87,9 @@ public class DataFile extends DiskFile implements Comparable, RefCount {
             mmapBuffer.position(skipToSpecificBlock(fileHeader.getReadOffset()));
             break;
         case WRITE:
-            mmapBuffer.position(skipToSpecificBlock(fileHeader.getBlockUsed()));
+            int n = Math.max(0, fileHeader.getBlockUsed() - 1);
+            mmapBuffer.position(skipToSpecificBlock(n));
+            fileHeader.setBlockUsed(n);
             break;
         }
 
@@ -110,8 +112,8 @@ public class DataFile extends DiskFile implements Comparable, RefCount {
             // we successfully get the next Block. next we write the previous
             // one to disk and flush the dirty page
             if (fileManager.getConfigure().get(Option.SYNC) == Syncer.BLOCK) {
-                System.err.println("2 -------------------------");
-                sync();
+//                System.err.println("2 -------------------------");
+//                sync();
             }
         }
 
@@ -119,7 +121,8 @@ public class DataFile extends DiskFile implements Comparable, RefCount {
             fileHeader.setBlockUsed(fileHeader.getBlockUsed() + 1);
             fileHeader.unwriteable();
 
-            moveToNextBlock();
+            if (!moveToNextBlock())
+                System.err.println("=================================");
             memoryBlock = Block.with(mmapBuffer, false);
 
             //sync();
@@ -156,9 +159,11 @@ public class DataFile extends DiskFile implements Comparable, RefCount {
                 ? BLOCK_SIZE - ((pos - DATA_BLOCK_HEADER_SIZE) % BLOCK_SIZE)
                 : 0;
 
+        System.err.println((mmapBuffer.position() + skip) + ", " + mmapBuffer.capacity());
         // no more block at the tail
         if (mmapBuffer.position() + skip + BLOCK_SIZE > mmapBuffer.capacity())
             return false;
+        System.out.println((mmapBuffer.position() + skip) + ", " + mmapBuffer.capacity());
 
         mmapBuffer.position(mmapBuffer.position() + skip);
         return true;
