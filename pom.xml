@@ -3,8 +3,8 @@
 
 	<modelVersion>4.0.0</modelVersion>
 
-	<groupId>org.diskqueue</groupId>
-	<artifactId>diskqueue-core</artifactId>
+	<groupId>org.diskstore</groupId>
+	<artifactId>diskstore-core</artifactId>
 	<version>0.0.1</version>
 	<packaging>jar</packaging>
 

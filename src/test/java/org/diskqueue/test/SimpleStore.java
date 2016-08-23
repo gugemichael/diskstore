@@ -1,11 +1,11 @@
 package org.diskqueue.test;
 
-import org.diskqueue.controller.Configure;
-import org.diskqueue.option.Option;
-import org.diskqueue.option.Syncer;
-import org.diskqueue.storage.block.Slice;
-import org.diskqueue.storage.store.AppendOnlyStore;
-import org.diskqueue.storage.store.MappedAppendOnlyStore;
+import org.diskstore.engine.Configuration;
+import org.diskstore.engine.Store;
+import org.diskstore.engine.option.Option;
+import org.diskstore.engine.option.Syncer;
+import org.diskstore.engine.storage.block.Slice;
+import org.diskstore.engine.storage.store.MMappedStore;
 
 import java.util.Arrays;
 
@@ -14,10 +14,9 @@ public class SimpleStore {
     public static void main(String[] args) throws InterruptedException {
 
 
-        final AppendOnlyStore store = new MappedAppendOnlyStore(null,
-                new Configure().set(Option.SYNC, Syncer.BLOCK)
-                        .set(Option.DATA_PATH, "/tmp/diskqueue")
-                        .set(Option.NAME, "myqueue").set(Option.RECOVERY, true));
+        final Store store = new MMappedStore(new Configuration().set(Option.SYNC, Syncer.BLOCK)
+                                                            .set(Option.DATA_PATH, "/tmp/diskstore")
+                                                            .set(Option.NAME, "store").set(Option.RECOVERY, true));
 
         class Writer extends Thread {
             @Override
@@ -49,7 +48,7 @@ public class SimpleStore {
                     Slice slice;
                     Arrays.fill(mem, (byte) 8);
                     while (i-- != 0) {
-                        if ((slice = store.fetch()) == null) {
+                        if ((slice = store.readNext()) == null) {
                             Thread.sleep(5);
                         } else {
                             if (!Arrays.equals(mem, slice.body)) {
