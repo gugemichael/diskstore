@@ -1,4 +1,4 @@
-package org.diskqueue.test;
+package org.diskstore.test;
 
 import org.diskstore.engine.Configuration;
 import org.diskstore.engine.Store;
