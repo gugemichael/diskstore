@@ -36,13 +36,6 @@ public class Option<T> {
     public static Option<String> NAME = new Option<>("diskstore");
 
     /**
-     * storage type .
-     *
-     * @see StorageType
-     */
-    public static Option<StorageType> STORAGE = new Option<>(StorageType.PERSISTENCE);
-
-    /**
      * recover from the prevois status with file underlay storage while restart
      *
      */
