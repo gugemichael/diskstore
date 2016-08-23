@@ -57,8 +57,6 @@ public class FileHandle implements Flushable {
                 newest.sync();
             }
         }
-
-        assert (retry == 7);
     }
 
     private boolean ensureWriteableBlock() {
