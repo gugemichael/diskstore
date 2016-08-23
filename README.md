@@ -1,2 +1,2 @@
-# diskqueue
-An in-memory and disk mixed backend storage Queue. automatically store elements in memory or disk.
+# DiskStore
+An file system backend storage engine. sequence write & read like a Queue.
