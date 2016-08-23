@@ -10,7 +10,7 @@ public class Block {
     // Fixed block size
     public static final int BLOCK_SIZE = 4 * 1024 * 1024;
     // Block sequence bumber
-    public static final AtomicInteger blockNumber = new AtomicInteger();
+    public static final AtomicInteger BlockNumber = new AtomicInteger();
 
     // detail meta data of this Block
     private BlockHeader blockHeader = new BlockHeader();

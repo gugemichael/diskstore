@@ -35,9 +35,7 @@ public class BlockHeader {
             }
             System.out.println();
         } else {
-            // setBlockNumber(Block.blockNumber.getAndIncrement());
-            setBlockNumber(0xAAAAAAAA);
-            setChecksum(0x33333322);
+            setBlockNumber(Block.BlockNumber.getAndIncrement());
         }
         return true;
     }

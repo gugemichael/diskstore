@@ -98,7 +98,6 @@ public class FileHandle implements Flushable {
         // check if the block has been frozen. may be we should
         // peek the next block from now
         if ((readBlock = earliest.nextReadBlock()) == null) {
-            System.out.println("complete earliest " + earliest.getGenericFile().getName());
             DataFile next = fileManager.getEarliestDataFile();
             if (next != null) {
                 // now we should release the earliest data file
@@ -109,7 +108,8 @@ public class FileHandle implements Flushable {
             } else {
                 return null;
             }
-        }
+        } else
+            ; // earliest.sync();        // flush read offset
 
         return readBlock;
     }
@@ -117,7 +117,6 @@ public class FileHandle implements Flushable {
 
     @Override
     public void flush() throws IOException {
-        System.out.println("============================ flush");
         newest.sync();
     }
 }

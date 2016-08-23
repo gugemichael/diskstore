@@ -1,7 +1,5 @@
 package org.diskqueue.storage.block;
 
-import org.diskqueue.option.Option;
-import org.diskqueue.option.Syncer;
 import org.diskqueue.storage.FileManager;
 import org.diskqueue.storage.store.DiskFile;
 import org.diskqueue.storage.store.FileStatus;
@@ -34,8 +32,6 @@ public class DataFile extends DiskFile implements Comparable, RefCount {
     // data file sequence number
     private final int fileNumber;
 
-    private int readBlockOffset = -1;
-
     // memory map related
     private FileChannel mmapFileChannel;
     private MappedByteBuffer mmapBuffer;
@@ -65,11 +61,10 @@ public class DataFile extends DiskFile implements Comparable, RefCount {
 
         // TODO : ftruncate the file. this operation don't fill zero into the file
         RandomAccessFile accessable = new RandomAccessFile(thisFile, "rw");
-        FileChannel.MapMode mode = FileChannel.MapMode.READ_ONLY;
-        if (fileStatus == FileStatus.WRITE) {
+        FileChannel.MapMode mode = FileChannel.MapMode.READ_WRITE;
+        if (fileStatus == FileStatus.WRITE)
             accessable.setLength(DATA_BLOCK_FILE_SIZE);
-            mode = FileChannel.MapMode.READ_WRITE;
-        }
+
         // make channel
         mmapFileChannel = accessable.getChannel();
         // mount entire file to New byte array buffer
@@ -82,16 +77,21 @@ public class DataFile extends DiskFile implements Comparable, RefCount {
         // parse datafile fileHeader
         fileHeader.from(mmapBuffer);
 
+        // don't sync(). wait util one Block written
+        fileHeader.setStartBlockNumber(Block.BlockNumber.intValue());
+
+        int pos = 0;
         switch (fileStatus) {
         case READ:
-            mmapBuffer.position(skipToSpecificBlock(fileHeader.getReadOffset()));
+            pos = Math.max(0, fileHeader.getReadOffset() - 1);
             break;
         case WRITE:
-            int n = Math.max(0, fileHeader.getBlockUsed() - 1);
-            mmapBuffer.position(skipToSpecificBlock(n));
-            fileHeader.setBlockUsed(n);
+            pos = Math.max(0, fileHeader.getBlockUsed() - 1);
+            fileHeader.setBlockUsed(pos);
             break;
         }
+
+        mmapBuffer.position(skipToSpecificBlock(pos));
 
         return this;
     }
@@ -107,25 +107,16 @@ public class DataFile extends DiskFile implements Comparable, RefCount {
         // fix and update the previous one's fileHeader information
         if (memoryBlock != null) {
             assert (memoryBlock.isFrozen());
-            memoryBlock.getBlockHeader().setChecksum(0x22222233); // memoryBlock.getBlockHeader().setChecksum(memoryBlock.checksum());
-
-            // we successfully get the next Block. next we write the previous
-            // one to disk and flush the dirty page
-            if (fileManager.getConfigure().get(Option.SYNC) == Syncer.BLOCK) {
-//                System.err.println("2 -------------------------");
-//                sync();
-            }
+            memoryBlock.getBlockHeader().setChecksum(memoryBlock.checksum());
         }
 
         if (fileHeader.getBlockUsed() + 1 <= MAX_BLOCK_COUNT) {
             fileHeader.setBlockUsed(fileHeader.getBlockUsed() + 1);
             fileHeader.unwriteable();
 
-            if (!moveToNextBlock())
-                System.err.println("=================================");
+            moveToNextBlock();
             memoryBlock = Block.with(mmapBuffer, false);
 
-            //sync();
             return memoryBlock;
         }
 
@@ -136,14 +127,13 @@ public class DataFile extends DiskFile implements Comparable, RefCount {
         System.out.println("[[[[ next read block of " + getGenericFile().getName() + "]]]]]");
         assert (fileStatus == FileStatus.READ);
         // there is no more block in this file
-        if (!moveToNextBlock()) {
-            System.out.println("======= file end ======");
+        if (!moveToNextBlock())
             return null;
-        }
 
-        readBlockOffset++;
+        fileHeader.setReadOffset(fileHeader.getReadOffset() + 1);
+
         memoryBlock = Block.with(mmapBuffer, true);
-        System.out.println("blockNumber " + memoryBlock.getBlockHeader().getBlockNumber());
+        System.out.println("BlockNumber " + memoryBlock.getBlockHeader().getBlockNumber());
         System.out.println("blockCount " + memoryBlock.getBlockHeader().getSliceCount());
         System.out.println("isFrozen " + memoryBlock.getBlockHeader().getFrozen());
         System.out.println("checksum " + memoryBlock.getBlockHeader().getChecksum());
@@ -184,7 +174,6 @@ public class DataFile extends DiskFile implements Comparable, RefCount {
 
     @Override
     public synchronized void sync() {
-        assert (fileStatus == FileStatus.WRITE);
         // flush fileHeader and modified content
         mmapBuffer.force();
     }
