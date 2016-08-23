@@ -55,7 +55,7 @@ public class FileCleanupDeleter extends Hypervisor {
 
             // wait all above inserted file elements for complete
             if (waitCompleted)
-                delete(file);
+                delete(renamed);
             else
                 toBeDeleted.offer(renamed);
         }
