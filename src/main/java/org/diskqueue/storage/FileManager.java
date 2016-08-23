@@ -26,13 +26,13 @@ public class FileManager {
     private final AtomicInteger nextSequenceFileNumber = new AtomicInteger(0);
 
     // current directory
-    private File folder;
-    private String namespace;
+    private volatile File folder;
+    private volatile String namespace;
 
     // manifest metadata file
     private Manifest manifest;
     // data block files
-    private DataFile writeDataFile;
+    private volatile DataFile writeDataFile;
     private ConcurrentSkipListMap<DataFile, RefCounter<DataFile>> readDataFileSet = new ConcurrentSkipListMap<>();
     private ConcurrentSkipListMap<DataFile, RefCounter<DataFile>> releaseMap = new ConcurrentSkipListMap<>();
 

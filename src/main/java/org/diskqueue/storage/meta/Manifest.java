@@ -1,7 +1,6 @@
 package org.diskqueue.storage.meta;
 
 import org.diskqueue.storage.FileManager;
-import org.diskqueue.storage.block.DataFile;
 import org.diskqueue.storage.store.DiskFile;
 import org.diskqueue.storage.store.FileStatus;
 
@@ -9,8 +8,6 @@ import java.io.*;
 import java.util.Date;
 
 public class Manifest extends DiskFile {
-    // Data file permanent size
-    public final int DataFileSize = DataFile.DATA_BLOCK_FILE_SIZE;
     // Data file count
     public int DataFileCount;
     // last created file full name
@@ -63,8 +60,6 @@ public class Manifest extends DiskFile {
             BufferedReader reader = null;
             reader = new BufferedReader(new FileReader(self));
             String line = null;
-            // for DataFileSize
-            line = reader.readLine();
             // for DataFileCount
             line = reader.readLine();
             if (line == null || !line.contains("="))
@@ -99,8 +94,6 @@ public class Manifest extends DiskFile {
             try {
                 LastSyncTime = new Date().toString();
                 writer = new BufferedWriter(new FileWriter(self));
-                writer.write(String.format("DataFileSize=%d", DataFileSize));
-                writer.newLine();
                 writer.write(String.format("DataFileCount=%d", DataFileCount));
                 writer.newLine();
                 writer.write(String.format("LastCreatedDataFile=%s", LastCreatedDataFile));
